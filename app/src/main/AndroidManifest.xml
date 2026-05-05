@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
-    <uses-permission android:name="android.permission.BIND_ACCESSIBILITY_SERVICE"/>
-
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -20,19 +17,19 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".SettingsActivity" />
-        <service android:name=".FloatingOverlayService" />
+        <activity android:name=".SettingsActivity" android:exported="true" />
 
         <service
-            android:name=".AutoTyperAccessibilityService"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:name=".ime.AutoTyperIME"
+            android:label="AutoTyper Keyboard"
+            android:permission="android.permission.BIND_INPUT_METHOD"
             android:exported="true">
             <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService"/>
+                <action android:name="android.view.InputMethod" />
             </intent-filter>
             <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/accessibility_service_config"/>
+                android:name="android.view.im"
+                android:resource="@xml/method" />
         </service>
     </application>
 

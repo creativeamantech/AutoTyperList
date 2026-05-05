@@ -32,34 +32,6 @@
                 android:textSize="16sp"
                 android:paddingVertical="8dp" />
 
-            <com.google.android.material.switchmaterial.SwitchMaterial
-                android:id="@+id/switchShowInBackground"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Show overlay when app is in background"
-                android:textSize="16sp"
-                android:paddingVertical="8dp" />
-
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="Typing Delay (ms)"
-                android:textSize="16sp"
-                android:layout_marginTop="16dp" />
-
-            <com.google.android.material.textfield.TextInputLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp">
-
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/etDelay"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:inputType="number"
-                    android:hint="e.g. 500" />
-            </com.google.android.material.textfield.TextInputLayout>
-
             <Button
                 android:id="@+id/btnClearAll"
                 android:layout_width="match_parent"

@@ -2,11 +2,9 @@ package com.autotyper
 
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
-import android.view.accessibility.AccessibilityManager
+import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.TextView
 import androidx.activity.viewModels
@@ -15,7 +13,6 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -30,8 +27,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var adapter: ItemListAdapter
     private lateinit var sharedPrefsHelper: SharedPrefsHelper
 
-    private lateinit var tvOverlayStatus: TextView
-    private lateinit var tvAccessibilityStatus: TextView
+    private lateinit var tvImeStatus: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -77,54 +73,47 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        updatePermissionStatuses()
-        checkAndStartOverlay()
+        updateImeStatus()
     }
 
     private fun setupPermissionsUI() {
-        tvOverlayStatus = findViewById(R.id.tvOverlayStatus)
-        tvAccessibilityStatus = findViewById(R.id.tvAccessibilityStatus)
+        tvImeStatus = findViewById(R.id.tvImeStatus)
 
-        findViewById<Button>(R.id.btnOverlayPermission).setOnClickListener {
-            if (!Settings.canDrawOverlays(this)) {
-                val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
-                startActivity(intent)
-            }
+        findViewById<Button>(R.id.btnEnableKeyboard).setOnClickListener {
+            startActivity(Intent(Settings.ACTION_INPUT_METHOD_SETTINGS))
         }
 
-        findViewById<Button>(R.id.btnAccessibilityPermission).setOnClickListener {
-            if (!isAccessibilityServiceEnabled()) {
-                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                startActivity(intent)
-            }
+        findViewById<Button>(R.id.btnSwitchKeyboard).setOnClickListener {
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.showInputMethodPicker()
         }
     }
 
-    private fun updatePermissionStatuses() {
-        val hasOverlay = Settings.canDrawOverlays(this)
-        tvOverlayStatus.text = "Display Over Other Apps: " + (if (hasOverlay) "Enabled" else "Disabled")
+    private fun updateImeStatus() {
+        val isEnabled = isImeEnabled()
+        val isDefault = isImeDefault()
 
-        val hasAccessibility = isAccessibilityServiceEnabled()
-        tvAccessibilityStatus.text = "Accessibility Service: " + (if (hasAccessibility) "Enabled" else "Disabled")
+        if (isDefault) {
+            tvImeStatus.text = "Keyboard Status: Active"
+            tvImeStatus.setTextColor(android.graphics.Color.parseColor("#388E3C")) // Green
+        } else if (isEnabled) {
+            tvImeStatus.text = "Keyboard Status: Enabled (Not Active)"
+            tvImeStatus.setTextColor(android.graphics.Color.parseColor("#F57C00")) // Orange
+        } else {
+            tvImeStatus.text = "Keyboard Status: Disabled"
+            tvImeStatus.setTextColor(android.graphics.Color.parseColor("#D32F2F")) // Red
+        }
     }
 
-    private fun isAccessibilityServiceEnabled(): Boolean {
-        var isEnabled = false
-        val am = getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
-        val enabledServices = am.getEnabledAccessibilityServiceList(android.accessibilityservice.AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
-        for (service in enabledServices) {
-            if (service.resolveInfo.serviceInfo.packageName == packageName) {
-                isEnabled = true
-                break
-            }
-        }
-        return isEnabled
+    private fun isImeEnabled(): Boolean {
+        val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        val imes = imm.enabledInputMethodList
+        return imes.any { it.packageName == packageName }
     }
 
-    private fun checkAndStartOverlay() {
-        if (Settings.canDrawOverlays(this)) {
-            startService(Intent(this, FloatingOverlayService::class.java))
-        }
+    private fun isImeDefault(): Boolean {
+        val defaultIme = Settings.Secure.getString(contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
+        return defaultIme?.contains(packageName) == true
     }
 
     private fun setupRecyclerView() {
@@ -134,8 +123,6 @@ class MainActivity : AppCompatActivity() {
             onItemClick = { position ->
                 sharedPrefsHelper.currentSelectedIndex = position
                 adapter.selectedIndex = position
-                // Notify overlay of selection change
-                LocalBroadcastManager.getInstance(this).sendBroadcast(Intent("com.autotyper.ACTION_UPDATE_OVERLAY"))
             }
         )
         recyclerView.adapter = adapter

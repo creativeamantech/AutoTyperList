@@ -15,3 +15,5 @@ app/build/
 .gradle/
 build/
 app/build/
+keystore.properties
+release.keystore

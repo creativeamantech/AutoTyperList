@@ -40,9 +40,10 @@
                 android:padding="16dp">
 
                 <TextView
+                    android:id="@+id/tvImeStatus"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Required Permissions"
+                    android:text="Keyboard Status: Disabled"
                     android:textStyle="bold"
                     android:textSize="16sp" />
 
@@ -53,40 +54,23 @@
                     android:gravity="center_vertical"
                     android:layout_marginTop="8dp">
 
-                    <TextView
-                        android:id="@+id/tvOverlayStatus"
+                    <Button
+                        android:id="@+id/btnEnableKeyboard"
+                        style="@style/Widget.Material3.Button.TonalButton"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="Display Over Other Apps: Disabled" />
+                        android:text="Enable Keyboard"
+                        android:layout_marginEnd="4dp" />
 
                     <Button
-                        android:id="@+id/btnOverlayPermission"
-                        style="@style/Widget.Material3.Button.TextButton"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Enable" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
-
-                    <TextView
-                        android:id="@+id/tvAccessibilityStatus"
+                        android:id="@+id/btnSwitchKeyboard"
+                        style="@style/Widget.Material3.Button.TonalButton"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="Accessibility Service: Disabled" />
-
-                    <Button
-                        android:id="@+id/btnAccessibilityPermission"
-                        style="@style/Widget.Material3.Button.TextButton"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Enable" />
+                        android:text="Switch To Keyboard"
+                        android:layout_marginStart="4dp" />
                 </LinearLayout>
 
             </LinearLayout>
