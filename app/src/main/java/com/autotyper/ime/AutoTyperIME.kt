@@ -2,10 +2,12 @@ package com.autotyper.ime
 
 import android.inputmethodservice.InputMethodService
 import android.os.Build
+import android.util.Log
 import android.view.View
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.ImageButton
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import com.autotyper.ItemDao
@@ -18,6 +20,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class AutoTyperIME : InputMethodService() {
 
@@ -28,7 +31,7 @@ class AutoTyperIME : InputMethodService() {
     private var dbJob: Job? = null
     private var allItems: List<ItemEntity> = emptyList()
 
-    private lateinit var tvImeStatus: TextView
+    private var tvImeStatus: TextView? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -37,45 +40,50 @@ class AutoTyperIME : InputMethodService() {
     }
 
     override fun onCreateInputView(): View {
-        val view = layoutInflater.inflate(R.layout.ime_layout, null)
+        return try {
+            val view = layoutInflater.inflate(R.layout.ime_layout, null)
 
-        tvImeStatus = view.findViewById(R.id.tvImeStatus)
-        val btnSwitchIme = view.findViewById<Button>(R.id.btnSwitchIme)
-        val btnPrev = view.findViewById<ImageButton>(R.id.btnImePrev)
-        val btnNext = view.findViewById<ImageButton>(R.id.btnImeNext)
-        val btnTypeNow = view.findViewById<Button>(R.id.btnImeTypeNow)
+            tvImeStatus = view.findViewById(R.id.tvImeStatus)
+            val btnSwitchIme = view.findViewById<Button>(R.id.btnSwitchIme)
+            val btnPrev = view.findViewById<ImageButton>(R.id.btnImePrev)
+            val btnNext = view.findViewById<ImageButton>(R.id.btnImeNext)
+            val btnTypeNow = view.findViewById<Button>(R.id.btnImeTypeNow)
 
-        btnSwitchIme.setOnClickListener {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                switchToPreviousInputMethod()
-            } else {
-                val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
-                imm.showInputMethodPicker()
-            }
-        }
-
-        btnPrev.setOnClickListener { moveToPrev() }
-        btnNext.setOnClickListener { moveToNext() }
-
-        btnTypeNow.setOnClickListener {
-            val ic = currentInputConnection
-            if (ic == null) {
-                Toast.makeText(this, "Please tap inside a text field first.", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-
-            val idx = sharedPrefsHelper.currentSelectedIndex
-            if (idx in allItems.indices) {
-                val textToType = allItems[idx].text
-                ic.commitText(textToType, 1)
-
-                if (sharedPrefsHelper.autoAdvance) {
-                    moveToNext()
+            btnSwitchIme?.setOnClickListener {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    switchToPreviousInputMethod()
+                } else {
+                    val imm = getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
+                    imm.showInputMethodPicker()
                 }
             }
-        }
 
-        return view
+            btnPrev?.setOnClickListener { moveToPrev() }
+            btnNext?.setOnClickListener { moveToNext() }
+
+            btnTypeNow?.setOnClickListener {
+                val ic = currentInputConnection
+                if (ic == null) {
+                    Toast.makeText(this, "Please tap inside a text field first.", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+
+                val idx = getClampedIndex()
+                if (idx in allItems.indices) {
+                    val textToType = allItems[idx].text
+                    ic.commitText(textToType, 1)
+
+                    if (sharedPrefsHelper.autoAdvance) {
+                        moveToNext()
+                    }
+                }
+            }
+
+            view
+        } catch (e: Exception) {
+            Log.e("AutoTyperIME", "onCreateInputView failed", e)
+            LinearLayout(this)
+        }
     }
 
     override fun onStartInputView(info: android.view.inputmethod.EditorInfo?, restarting: Boolean) {
@@ -90,17 +98,24 @@ class AutoTyperIME : InputMethodService() {
 
     private fun loadItems() {
         dbJob?.cancel()
-        dbJob = imeScope.launch {
+        dbJob = imeScope.launch(Dispatchers.IO) {
             itemDao.getAllItems().collect { items ->
-                allItems = items
-                refreshUI()
+                withContext(Dispatchers.Main) {
+                    allItems = items
+                    refreshUI()
+                }
             }
         }
     }
 
+    private fun getClampedIndex(): Int {
+        val stored = sharedPrefsHelper.currentSelectedIndex
+        return stored.coerceIn(0, (allItems.size - 1).coerceAtLeast(0))
+    }
+
     private fun moveToNext() {
         if (allItems.isNotEmpty()) {
-            var idx = sharedPrefsHelper.currentSelectedIndex
+            var idx = getClampedIndex()
             if (idx < allItems.size - 1) {
                 idx++
             } else {
@@ -113,7 +128,7 @@ class AutoTyperIME : InputMethodService() {
 
     private fun moveToPrev() {
         if (allItems.isNotEmpty()) {
-            var idx = sharedPrefsHelper.currentSelectedIndex
+            var idx = getClampedIndex()
             if (idx > 0) {
                 idx--
             } else {
@@ -125,22 +140,19 @@ class AutoTyperIME : InputMethodService() {
     }
 
     private fun refreshUI() {
-        if (!::tvImeStatus.isInitialized) return
+        val statusTextView = tvImeStatus ?: return
 
         if (allItems.isEmpty()) {
-            tvImeStatus.text = "Empty list"
+            statusTextView.text = "Empty list"
             return
         }
 
-        var idx = sharedPrefsHelper.currentSelectedIndex
-        if (idx >= allItems.size) {
-            idx = allItems.size - 1
-            sharedPrefsHelper.currentSelectedIndex = idx
-        }
+        val idx = getClampedIndex()
+        // Save the clamped index back to shared prefs
+        sharedPrefsHelper.currentSelectedIndex = idx
 
         val currentItem = allItems[idx]
-        // Requested format: #index of total | value preview
-        tvImeStatus.text = "#${idx + 1} of ${allItems.size} | ${currentItem.text}"
+        statusTextView.text = "#${idx + 1} of ${allItems.size} | ${currentItem.text}"
     }
 
     override fun onDestroy() {
