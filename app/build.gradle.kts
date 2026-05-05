@@ -8,6 +8,15 @@ android {
     namespace = "com.autotyper"
     compileSdk = 34
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("../release.keystore")
+            storePassword = "password"
+            keyAlias = "autotyper"
+            keyPassword = "password"
+        }
+    }
+
     defaultConfig {
         applicationId = "com.autotyper"
         minSdk = 26
@@ -24,6 +33,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {
