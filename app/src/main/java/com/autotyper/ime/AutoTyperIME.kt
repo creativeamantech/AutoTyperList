@@ -4,16 +4,16 @@ import android.inputmethodservice.InputMethodService
 import android.os.Build
 import android.util.Log
 import android.view.View
+import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
-import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import com.autotyper.ItemDao
 import com.autotyper.ItemDatabase
 import com.autotyper.ItemEntity
-import com.autotyper.R
 import com.autotyper.SharedPrefsHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -40,16 +40,64 @@ class AutoTyperIME : InputMethodService() {
     }
 
     override fun onCreateInputView(): View {
-        return try {
-            val view = layoutInflater.inflate(R.layout.ime_layout, null)
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(android.graphics.Color.parseColor("#1E1E1E"))
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                480 // hardcoded pixels
+            )
+        }
 
-            tvImeStatus = view.findViewById(R.id.tvImeStatus)
-            val btnSwitchIme = view.findViewById<Button>(R.id.btnSwitchIme)
-            val btnPrev = view.findViewById<ImageButton>(R.id.btnImePrev)
-            val btnNext = view.findViewById<ImageButton>(R.id.btnImeNext)
-            val btnTypeNow = view.findViewById<Button>(R.id.btnImeTypeNow)
+        // Status Row
+        tvImeStatus = TextView(this).apply {
+            text = "#0 of 0 | Empty"
+            setTextColor(android.graphics.Color.WHITE)
+            textSize = 14f
+            setPadding(16, 16, 16, 16)
+        }
+        root.addView(tvImeStatus)
 
-            btnSwitchIme?.setOnClickListener {
+        val btnRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f
+            )
+        }
+
+        val btnPrev = Button(this).apply {
+            text = "◀"
+            layoutParams = LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+            setOnClickListener { moveToPrev() }
+        }
+
+        val btnTypeLayout = Button(this).apply {
+            text = "⌨ TYPE NOW"
+            layoutParams = LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.MATCH_PARENT, 2f)
+            setOnClickListener { typeCurrentItem() }
+        }
+
+        val btnNext = Button(this).apply {
+            text = "▶"
+            layoutParams = LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+            setOnClickListener { moveToNext() }
+        }
+
+        btnRow.addView(btnPrev)
+        btnRow.addView(btnTypeLayout)
+        btnRow.addView(btnNext)
+        root.addView(btnRow)
+
+        val btnSwitch = Button(this).apply {
+            text = "Switch Keyboard"
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            setOnClickListener {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                     switchToPreviousInputMethod()
                 } else {
@@ -57,37 +105,27 @@ class AutoTyperIME : InputMethodService() {
                     imm.showInputMethodPicker()
                 }
             }
-
-            btnPrev?.setOnClickListener { moveToPrev() }
-            btnNext?.setOnClickListener { moveToNext() }
-
-            btnTypeNow?.setOnClickListener {
-                val ic = currentInputConnection
-                if (ic == null) {
-                    Toast.makeText(this, "Please tap inside a text field first.", Toast.LENGTH_SHORT).show()
-                    return@setOnClickListener
-                }
-
-                val idx = getClampedIndex()
-                if (idx in allItems.indices) {
-                    val textToType = allItems[idx].text
-                    ic.commitText(textToType, 1)
-
-                    if (sharedPrefsHelper.autoAdvance) {
-                        moveToNext()
-                    }
-                }
-            }
-
-            view
-        } catch (e: Exception) {
-            Log.e("AutoTyperIME", "onCreateInputView failed", e)
-            LinearLayout(this)
         }
+        root.addView(btnSwitch)
+
+        // Ensure UI is up to date immediately if items exist
+        refreshUI()
+
+        return root
     }
 
-    override fun onStartInputView(info: android.view.inputmethod.EditorInfo?, restarting: Boolean) {
+    override fun onEvaluateFullscreenMode(): Boolean {
+        return false // ALWAYS return false — never go fullscreen
+    }
+
+    override fun onEvaluateInputViewShown(): Boolean {
+        super.onEvaluateInputViewShown()
+        return true // force the input view to always show
+    }
+
+    override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        setInputView(onCreateInputView()) // force re-attach the view
         loadItems()
     }
 
@@ -111,6 +149,24 @@ class AutoTyperIME : InputMethodService() {
     private fun getClampedIndex(): Int {
         val stored = sharedPrefsHelper.currentSelectedIndex
         return stored.coerceIn(0, (allItems.size - 1).coerceAtLeast(0))
+    }
+
+    private fun typeCurrentItem() {
+        val ic = currentInputConnection
+        if (ic == null) {
+            Toast.makeText(this, "Please tap inside a text field first.", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val idx = getClampedIndex()
+        if (idx in allItems.indices) {
+            val textToType = allItems[idx].text
+            ic.commitText(textToType, 1)
+
+            if (sharedPrefsHelper.autoAdvance) {
+                moveToNext()
+            }
+        }
     }
 
     private fun moveToNext() {
@@ -148,7 +204,6 @@ class AutoTyperIME : InputMethodService() {
         }
 
         val idx = getClampedIndex()
-        // Save the clamped index back to shared prefs
         sharedPrefsHelper.currentSelectedIndex = idx
 
         val currentItem = allItems[idx]
