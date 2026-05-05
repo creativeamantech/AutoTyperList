@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">AutoTyper</string>
+    <string name="accessibility_description">AutoTyper uses Accessibility Services to automatically type text into focused input fields across apps.</string>
+</resources>
