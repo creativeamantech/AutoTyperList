@@ -2,13 +2,13 @@ package com.autotyper.ime
 
 import android.inputmethodservice.InputMethodService
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.text.InputType
-import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
-import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.LinearLayout
@@ -22,7 +22,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -33,10 +32,10 @@ class AutoTyperIME : InputMethodService() {
 
     private val imeScope = CoroutineScope(Dispatchers.Main + Job())
     private var dbJob: Job? = null
-    private var typingJob: Job? = null
     private var allItems: List<ItemEntity> = emptyList()
 
     private var tvImeStatus: TextView? = null
+    private val handler = Handler(Looper.getMainLooper())
 
     override fun onCreate() {
         super.onCreate()
@@ -137,7 +136,11 @@ class AutoTyperIME : InputMethodService() {
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
         dbJob?.cancel()
-        typingJob?.cancel() // Stop typing if input is closed
+    }
+
+    override fun onFinishInput() {
+        handler.removeCallbacksAndMessages(null)
+        super.onFinishInput()
     }
 
     private fun loadItems() {
@@ -173,61 +176,30 @@ class AutoTyperIME : InputMethodService() {
         val textToType = allItems[idx].text
         val delayMs = sharedPrefsHelper.typingDelay
 
-        val inputType = currentInputEditorInfo?.inputType ?: 0
-        val isNumberField = (inputType and InputType.TYPE_MASK_CLASS) == InputType.TYPE_CLASS_NUMBER
-            || (inputType and InputType.TYPE_MASK_CLASS) == InputType.TYPE_CLASS_PHONE
+        handler.removeCallbacksAndMessages(null) // cancel any existing typing
 
-        typingJob?.cancel()
-        typingJob = imeScope.launch(Dispatchers.IO) {
-            if (isNumberField) {
-                sendAsKeyEvents(ic, textToType, delayMs)
-            } else {
-                sendAsCommitText(ic, textToType, delayMs)
-            }
+        textToType.forEachIndexed { index, char ->
+            handler.postDelayed({
+                val inputType = currentInputEditorInfo?.inputType ?: 0
+                val isNumberField =
+                    (inputType and InputType.TYPE_MASK_CLASS) == InputType.TYPE_CLASS_NUMBER ||
+                    (inputType and InputType.TYPE_MASK_CLASS) == InputType.TYPE_CLASS_PHONE
 
-            withContext(Dispatchers.Main) {
-                if (sharedPrefsHelper.autoAdvance) {
-                    moveToNext()
-                }
-            }
-        }
-    }
-
-    private suspend fun sendAsKeyEvents(ic: InputConnection, text: String, delayMs: Long) {
-        for (char in text) {
-            val keyCode = when (char) {
-                '0' -> KeyEvent.KEYCODE_0
-                '1' -> KeyEvent.KEYCODE_1
-                '2' -> KeyEvent.KEYCODE_2
-                '3' -> KeyEvent.KEYCODE_3
-                '4' -> KeyEvent.KEYCODE_4
-                '5' -> KeyEvent.KEYCODE_5
-                '6' -> KeyEvent.KEYCODE_6
-                '7' -> KeyEvent.KEYCODE_7
-                '8' -> KeyEvent.KEYCODE_8
-                '9' -> KeyEvent.KEYCODE_9
-                else -> null
-            }
-            if (keyCode != null) {
-                withContext(Dispatchers.Main) {
+                if (isNumberField && char.isDigit()) {
+                    val keyCode = char.digitToInt() + KeyEvent.KEYCODE_0
                     ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
                     ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
+                } else {
+                    ic.commitText(char.toString(), 1)
                 }
-            } else {
-                withContext(Dispatchers.Main) {
-                    ic.commitText(char.toString(), 1) // fallback for non-digit chars
-                }
-            }
-            if (delayMs > 0) delay(delayMs)
-        }
-    }
 
-    private suspend fun sendAsCommitText(ic: InputConnection, text: String, delayMs: Long) {
-        for (char in text) {
-            withContext(Dispatchers.Main) {
-                ic.commitText(char.toString(), 1)
-            }
-            if (delayMs > 0) delay(delayMs)
+                // After last character, auto-advance if enabled
+                if (index == textToType.lastIndex) {
+                    if (sharedPrefsHelper.autoAdvance) {
+                        moveToNext()
+                    }
+                }
+            }, delayMs * index)
         }
     }
 
@@ -273,6 +245,7 @@ class AutoTyperIME : InputMethodService() {
     }
 
     override fun onDestroy() {
+        handler.removeCallbacksAndMessages(null)
         super.onDestroy()
         imeScope.cancel()
     }
