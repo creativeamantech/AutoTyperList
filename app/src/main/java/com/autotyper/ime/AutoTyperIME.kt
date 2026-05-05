@@ -2,10 +2,13 @@ package com.autotyper.ime
 
 import android.inputmethodservice.InputMethodService
 import android.os.Build
+import android.text.InputType
 import android.util.Log
+import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputConnection
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
 import android.widget.LinearLayout
@@ -19,6 +22,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -29,6 +33,7 @@ class AutoTyperIME : InputMethodService() {
 
     private val imeScope = CoroutineScope(Dispatchers.Main + Job())
     private var dbJob: Job? = null
+    private var typingJob: Job? = null
     private var allItems: List<ItemEntity> = emptyList()
 
     private var tvImeStatus: TextView? = null
@@ -132,6 +137,7 @@ class AutoTyperIME : InputMethodService() {
     override fun onFinishInputView(finishingInput: Boolean) {
         super.onFinishInputView(finishingInput)
         dbJob?.cancel()
+        typingJob?.cancel() // Stop typing if input is closed
     }
 
     private fun loadItems() {
@@ -159,13 +165,69 @@ class AutoTyperIME : InputMethodService() {
         }
 
         val idx = getClampedIndex()
-        if (idx in allItems.indices) {
-            val textToType = allItems[idx].text
-            ic.commitText(textToType, 1)
+        if (idx !in allItems.indices) {
+            Toast.makeText(this, "List is empty", Toast.LENGTH_SHORT).show()
+            return
+        }
 
-            if (sharedPrefsHelper.autoAdvance) {
-                moveToNext()
+        val textToType = allItems[idx].text
+        val delayMs = sharedPrefsHelper.typingDelay
+
+        val inputType = currentInputEditorInfo?.inputType ?: 0
+        val isNumberField = (inputType and InputType.TYPE_MASK_CLASS) == InputType.TYPE_CLASS_NUMBER
+            || (inputType and InputType.TYPE_MASK_CLASS) == InputType.TYPE_CLASS_PHONE
+
+        typingJob?.cancel()
+        typingJob = imeScope.launch(Dispatchers.IO) {
+            if (isNumberField) {
+                sendAsKeyEvents(ic, textToType, delayMs)
+            } else {
+                sendAsCommitText(ic, textToType, delayMs)
             }
+
+            withContext(Dispatchers.Main) {
+                if (sharedPrefsHelper.autoAdvance) {
+                    moveToNext()
+                }
+            }
+        }
+    }
+
+    private suspend fun sendAsKeyEvents(ic: InputConnection, text: String, delayMs: Long) {
+        for (char in text) {
+            val keyCode = when (char) {
+                '0' -> KeyEvent.KEYCODE_0
+                '1' -> KeyEvent.KEYCODE_1
+                '2' -> KeyEvent.KEYCODE_2
+                '3' -> KeyEvent.KEYCODE_3
+                '4' -> KeyEvent.KEYCODE_4
+                '5' -> KeyEvent.KEYCODE_5
+                '6' -> KeyEvent.KEYCODE_6
+                '7' -> KeyEvent.KEYCODE_7
+                '8' -> KeyEvent.KEYCODE_8
+                '9' -> KeyEvent.KEYCODE_9
+                else -> null
+            }
+            if (keyCode != null) {
+                withContext(Dispatchers.Main) {
+                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, keyCode))
+                    ic.sendKeyEvent(KeyEvent(KeyEvent.ACTION_UP, keyCode))
+                }
+            } else {
+                withContext(Dispatchers.Main) {
+                    ic.commitText(char.toString(), 1) // fallback for non-digit chars
+                }
+            }
+            if (delayMs > 0) delay(delayMs)
+        }
+    }
+
+    private suspend fun sendAsCommitText(ic: InputConnection, text: String, delayMs: Long) {
+        for (char in text) {
+            withContext(Dispatchers.Main) {
+                ic.commitText(char.toString(), 1)
+            }
+            if (delayMs > 0) delay(delayMs)
         }
     }
 

@@ -19,6 +19,6 @@ class SharedPrefsHelper(context: Context) {
         set(value) = prefs.edit().putBoolean("show_overlay_in_background", value).apply()
 
     var typingDelay: Long
-        get() = prefs.getLong("typing_delay", 500L)
+        get() = prefs.getLong("typing_delay", 50L)
         set(value) = prefs.edit().putLong("typing_delay", value).apply()
 }

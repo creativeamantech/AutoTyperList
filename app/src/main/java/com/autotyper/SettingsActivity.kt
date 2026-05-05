@@ -2,6 +2,7 @@ package com.autotyper
 
 import android.os.Bundle
 import android.widget.Button
+import android.widget.RadioGroup
 import androidx.activity.viewModels
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -24,10 +25,29 @@ class SettingsActivity : AppCompatActivity() {
 
         val switchAutoAdvance: SwitchMaterial = findViewById(R.id.switchAutoAdvance)
         val btnClearAll: Button = findViewById(R.id.btnClearAll)
+        val rgTypingDelay: RadioGroup = findViewById(R.id.rgTypingDelay)
 
         switchAutoAdvance.isChecked = sharedPrefsHelper.autoAdvance
         switchAutoAdvance.setOnCheckedChangeListener { _, isChecked ->
             sharedPrefsHelper.autoAdvance = isChecked
+        }
+
+        when (sharedPrefsHelper.typingDelay) {
+            0L -> rgTypingDelay.check(R.id.rbDelay0)
+            50L -> rgTypingDelay.check(R.id.rbDelay50)
+            100L -> rgTypingDelay.check(R.id.rbDelay100)
+            200L -> rgTypingDelay.check(R.id.rbDelay200)
+            else -> rgTypingDelay.check(R.id.rbDelay50) // Default
+        }
+
+        rgTypingDelay.setOnCheckedChangeListener { _, checkedId ->
+            sharedPrefsHelper.typingDelay = when (checkedId) {
+                R.id.rbDelay0 -> 0L
+                R.id.rbDelay50 -> 50L
+                R.id.rbDelay100 -> 100L
+                R.id.rbDelay200 -> 200L
+                else -> 50L
+            }
         }
 
         btnClearAll.setOnClickListener {

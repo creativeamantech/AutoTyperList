@@ -32,6 +32,51 @@
                 android:textSize="16sp"
                 android:paddingVertical="8dp" />
 
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Typing Delay"
+                android:textStyle="bold"
+                android:textSize="16sp"
+                android:layout_marginTop="16dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Small delays between keystrokes mimic real user typing and prevent blocks by secure apps."
+                android:textSize="12sp"
+                android:layout_marginBottom="8dp" />
+
+            <RadioGroup
+                android:id="@+id/rgTypingDelay"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <RadioButton
+                    android:id="@+id/rbDelay0"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="0ms - Fastest (May be detected)" />
+
+                <RadioButton
+                    android:id="@+id/rbDelay50"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="50ms - Recommended default" />
+
+                <RadioButton
+                    android:id="@+id/rbDelay100"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="100ms - Slower but most natural" />
+
+                <RadioButton
+                    android:id="@+id/rbDelay200"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="200ms - Maximum compatibility" />
+            </RadioGroup>
+
             <Button
                 android:id="@+id/btnClearAll"
                 android:layout_width="match_parent"
